@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SVG Dice — Roll</title>
+  <style>
+    :root{
+      --size: 240px;
+      --bg: #0f172a;
+      --card: #ffffff;
+      --accent: #ef4444;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0;
+      display:grid;
+      place-items:center;
+      background:linear-gradient(180deg,#0b1220 0%, #071326 100%);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;
+      color:#e6eef8;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:32px;
+    }
+
+    .container{
+      width:fit-content;
+      text-align:center;
+    }
+
+    .dice-card{
+      width:var(--size);
+      height:var(--size);
+      margin:0 auto 18px;
+      display:grid;
+      place-items:center;
+      background:linear-gradient(180deg,#ffffff 0%, #f3f4f6 100%);
+      border-radius:18px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.6), inset 0 2px 6px rgba(255,255,255,0.6);
+    }
+
+    svg{width:80%;height:80%;}
+
+    .pip{
+      opacity:0;transform-origin:center;transform:scale(0.35);
+      transition:opacity 220ms cubic-bezier(.2,.9,.2,1), transform 220ms cubic-bezier(.2,.9,.2,1);
+      fill:var(--bg);
+    }
+    .pip.show{
+      opacity:1;transform:scale(1);
+    }
+
+    .controls{
+      display:flex;gap:12px;align-items:center;justify-content:center;
+    }
+
+    button{
+      background:linear-gradient(180deg,var(--accent),#b91c1c);
+      color:white;border:0;padding:10px 18px;border-radius:10px;font-weight:600;
+      cursor:pointer;box-shadow:0 6px 18px rgba(239,68,68,0.28);
+    }
+    button:active{transform:translateY(1px);}
+
+    .label{
+      font-size:14px;color:#cfe3ff;margin-right:6px
+    }
+
+    .value{
+      font-weight:700;font-size:18px;color:#fff;padding:6px 10px;background:rgba(255,255,255,0.06);border-radius:8px;
+    }
+
+    /* small accessibility focus outline */
+    button:focus{outline:3px solid rgba(255,255,255,0.12);outline-offset:3px}
+
+    /* nice roll animation for the whole card */
+    .shake{
+      animation:shake 450ms cubic-bezier(.2,.9,.2,1);
+    }
+    @keyframes shake{
+      0%{transform:rotate(0deg) scale(1)}
+      20%{transform:rotate(-18deg) scale(1.02)}
+      40%{transform:rotate(12deg) scale(1.01)}
+      60%{transform:rotate(-6deg) scale(1)}
+      80%{transform:rotate(4deg) scale(1)}
+      100%{transform:rotate(0deg) scale(1)}
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="card" class="dice-card" aria-live="polite">
+      <!-- Single SVG where pips are toggled -->
+      <svg viewBox="0 0 100 100" role="img" aria-label="Dice face">
+        <!-- background rounded square inside svg to look like a die face -->
+        <rect x="6" y="6" width="88" height="88" rx="14" ry="14" fill="#ffffff" stroke="#e6e6e6" stroke-width="1" />
+
+        <!-- Define nine positions (we'll use only required ones) -->
+        <!-- Top row -->
+        <circle id="p1" class="pip" cx="28" cy="28" r="6"></circle>
+        <circle id="p2" class="pip" cx="50" cy="28" r="6"></circle>
+        <circle id="p3" class="pip" cx="72" cy="28" r="6"></circle>
+        <!-- Middle row -->
+        <circle id="p4" class="pip" cx="28" cy="50" r="6"></circle>
+        <circle id="p5" class="pip" cx="50" cy="50" r="6"></circle>
+        <circle id="p6" class="pip" cx="72" cy="50" r="6"></circle>
+        <!-- Bottom row -->
+        <circle id="p7" class="pip" cx="28" cy="72" r="6"></circle>
+        <circle id="p8" class="pip" cx="50" cy="72" r="6"></circle>
+        <circle id="p9" class="pip" cx="72" cy="72" r="6"></circle>
+      </svg>
+    </div>
+
+    <div class="controls" role="group" aria-label="Roll controls">
+      <div class="label">Result</div>
+      <div id="result" class="value">—</div>
+      <button id="rollBtn" aria-controls="card" aria-pressed="false">Roll</button>
+    </div>
+  </div>
+
+  <script>
+    // pip mapping for numbers 1..6 -> which pip ids should be shown
+    const mapping = {
+      1: ['p5'],
+      2: ['p1','p9'],
+      3: ['p1','p5','p9'],
+      4: ['p1','p3','p7','p9'],
+      5: ['p1','p3','p5','p7','p9'],
+      6: ['p1','p3','p4','p6','p7','p9'] // standard 6 uses middle-left/middle-right instead of center
+    };
+
+    const allPips = [...Array(9)].map((_,i)=>document.getElementById('p'+(i+1)));
+    const resultEl = document.getElementById('result');
+    const rollBtn = document.getElementById('rollBtn');
+    const card = document.getElementById('card');
+
+    function showNumber(n){
+      // hide all
+      allPips.forEach(p=>p.classList.remove('show'));
+      const ids = mapping[n] || [];
+      ids.forEach(id=>{
+        const el = document.getElementById(id);
+        if(el) el.classList.add('show');
+      });
+      resultEl.textContent = n;
+    }
+
+    function rollDice(){
+      // add shake animation
+      card.classList.remove('shake');
+      // force reflow to restart animation
+      void card.offsetWidth;
+      card.classList.add('shake');
+
+      // small "rolling" effect by showing random faces quickly
+      const flips = 8;
+      rollBtn.disabled = true; rollBtn.setAttribute('aria-pressed','true');
+      let i=0;
+      const t = setInterval(()=>{
+        const quick = Math.floor(Math.random()*6)+1;
+        showNumber(quick);
+        i++;
+        if(i>=flips){
+          clearInterval(t);
+          // final result
+          const final = Math.floor(Math.random()*6)+1;
+          // tiny timeout so final feels like a stop
+          setTimeout(()=>{
+            showNumber(final);
+            rollBtn.disabled = false; rollBtn.setAttribute('aria-pressed','false');
+          }, 120);
+        }
+      }, 80);
+    }
+
+    // initial face
+    showNumber(1);
+
+    rollBtn.addEventListener('click', rollDice);
+
+    // support space/enter on focused button
+    rollBtn.addEventListener('keyup', (e)=>{ if(e.key==='Enter' || e.key===' '){ rollDice(); } });
+
+    // allow pressing 'r' to roll (optional)
+    document.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase()==='r' && document.activeElement!==rollBtn){ rollDice(); }
+    });
+  </script>
+</body>
+</html>
+
