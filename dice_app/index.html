@@ -120,73 +120,91 @@
   </div>
 
   <script>
-    // pip mapping for numbers 1..6 -> which pip ids should be shown
-    const mapping = {
-      1: ['p5'],
-      2: ['p1','p9'],
-      3: ['p1','p5','p9'],
-      4: ['p1','p3','p7','p9'],
-      5: ['p1','p3','p5','p7','p9'],
-      6: ['p1','p3','p4','p6','p7','p9'] // standard 6 uses middle-left/middle-right instead of center
-    };
+  const mapping = {
+    1: ['p5'],
+    2: ['p1','p9'],
+    3: ['p1','p5','p9'],
+    4: ['p1','p3','p7','p9'],
+    5: ['p1','p3','p5','p7','p9'],
+    6: ['p1','p3','p4','p6','p7','p9']
+  };
 
-    const allPips = [...Array(9)].map((_,i)=>document.getElementById('p'+(i+1)));
-    const resultEl = document.getElementById('result');
-    const rollBtn = document.getElementById('rollBtn');
-    const card = document.getElementById('card');
+  const allPips = [...Array(9)].map((_,i)=>document.getElementById('p'+(i+1)));
+  const resultEl = document.getElementById('result');
+  const rollBtn = document.getElementById('rollBtn');
+  const card = document.getElementById('card');
 
-    function showNumber(n){
-      // hide all
-      allPips.forEach(p=>p.classList.remove('show'));
-      const ids = mapping[n] || [];
-      ids.forEach(id=>{
-        const el = document.getElementById(id);
-        if(el) el.classList.add('show');
-      });
-      resultEl.textContent = n;
-    }
+  let tapCount = 0; // track outside taps
 
-    function rollDice(){
-      // add shake animation
-      card.classList.remove('shake');
-      // force reflow to restart animation
-      void card.offsetWidth;
-      card.classList.add('shake');
-
-      // small "rolling" effect by showing random faces quickly
-      const flips = 8;
-      rollBtn.disabled = true; rollBtn.setAttribute('aria-pressed','true');
-      let i=0;
-      const t = setInterval(()=>{
-        const quick = Math.floor(Math.random()*6)+1;
-        showNumber(quick);
-        i++;
-        if(i>=flips){
-          clearInterval(t);
-          // final result
-          const final = Math.floor(Math.random()*6)+1;
-          // tiny timeout so final feels like a stop
-          setTimeout(()=>{
-            showNumber(final);
-            rollBtn.disabled = false; rollBtn.setAttribute('aria-pressed','false');
-          }, 120);
-        }
-      }, 80);
-    }
-
-    // initial face
-    showNumber(1);
-
-    rollBtn.addEventListener('click', rollDice);
-
-    // support space/enter on focused button
-    rollBtn.addEventListener('keyup', (e)=>{ if(e.key==='Enter' || e.key===' '){ rollDice(); } });
-
-    // allow pressing 'r' to roll (optional)
-    document.addEventListener('keydown', (e)=>{
-      if(e.key.toLowerCase()==='r' && document.activeElement!==rollBtn){ rollDice(); }
+  function showNumber(n){
+    allPips.forEach(p=>p.classList.remove('show'));
+    const ids = mapping[n] || [];
+    ids.forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.classList.add('show');
     });
-  </script>
+    resultEl.textContent = n;
+  }
+
+  function rollDice(){
+    card.classList.remove('shake');
+    void card.offsetWidth;
+    card.classList.add('shake');
+
+    rollBtn.disabled = true;
+    rollBtn.setAttribute('aria-pressed','true');
+
+    const flips = 8;
+    let i = 0;
+    const t = setInterval(()=>{
+      const quick = Math.floor(Math.random()*6)+1;
+      showNumber(quick);
+      i++;
+      if(i >= flips){
+        clearInterval(t);
+        setTimeout(()=>{
+          let final;
+          if(tapCount === 0){
+            // No outside taps → random roll
+            final = Math.floor(Math.random()*6)+1;
+          } else {
+            // Outside taps → deterministic
+            final = tapCount % 6 || 6;
+          }
+          showNumber(final);
+          rollBtn.disabled = false;
+          rollBtn.setAttribute('aria-pressed','false');
+          tapCount = 0; // reset after roll
+        }, 120);
+      }
+    }, 80);
+  }
+
+  // initial face
+  showNumber(1);
+
+  // roll triggers
+  rollBtn.addEventListener('click', rollDice);
+  card.addEventListener('click', rollDice);
+
+  // key controls
+  rollBtn.addEventListener('keyup', (e)=>{
+    if(e.key==='Enter' || e.key===' '){ rollDice(); }
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key.toLowerCase()==='r' && document.activeElement!==rollBtn){ rollDice(); }
+  });
+
+  // track outside clicks
+  document.addEventListener('click', (e)=>{
+    const clickedInsideDice = card.contains(e.target);
+    const clickedOnButton = rollBtn.contains(e.target);
+    if(!clickedInsideDice && !clickedOnButton){
+      tapCount++;
+      console.log('Outside taps:', tapCount);
+    }
+  });
+</script>
 </body>
 </html>
 
